@@ -130,7 +130,7 @@ jobs:
           {
             echo "## Generate stubs"
             echo ""
-            echo "| | |"
+            echo "| Field | Value |"
             echo "|---|---|"
             echo "| Result | ${{ job.status }} |"
             echo "| proto_ref | \`${{ steps.meta.outputs.proto_ref }}\` |"
