@@ -1,0 +1,125 @@
+name: Generate stubs
+
+on:
+  repository_dispatch:
+    types: [proto_release]
+  workflow_dispatch:
+    inputs:
+      proto_ref:
+        description: proto repo tag or SHA (e.g. v0.2.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    outputs:
+      proto_ref: ${{ steps.meta.outputs.proto_ref }}
+      tag: ${{ steps.publish.outputs.tag }}
+      committed: ${{ steps.publish.outputs.committed }}
+      skipped: ${{ steps.publish.outputs.skipped }}
+      release_url: ${{ steps.publish.outputs.release_url }}
+    steps:
+      - name: Resolve proto_ref
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            ref="${{ github.event.client_payload.proto_ref }}"
+          else
+            ref="${{ inputs.proto_ref }}"
+          fi
+          if [ -z "${ref}" ]; then
+            echo "proto_ref is empty" >&2
+            exit 1
+          fi
+          echo "proto_ref=${ref}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout proto
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ vars.PROTO_REPO != '' && vars.PROTO_REPO || 'huponx/x-protos' }}
+          ref: ${{ steps.meta.outputs.proto_ref }}
+          path: proto-src
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+
+      # Add a language: enable the plugin in x-protos/buf.gen.yaml;
+      # add setup-java / setup-python here if compile/publish needs it.
+
+      - name: Generate stubs
+        env:
+          PROTO_DIR: ${{ github.workspace }}/proto-src
+          PROTOGEN_DIR: ${{ github.workspace }}
+        run: bash proto-src/scripts/generate.sh
+
+      - name: Tidy Go module
+        working-directory: go
+        run: go mod tidy
+
+      - name: Publish
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.proto_ref }}
+        run: |
+          set -euo pipefail
+          echo "committed=false" >> "${GITHUB_OUTPUT}"
+          echo "skipped=false" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release_url=" >> "${GITHUB_OUTPUT}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add go
+          # git add java python rust
+          if git diff --cached --quiet; then
+            echo "No stub changes"
+          else
+            git commit -m "chore: generate from proto@${TAG}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "committed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists"
+            echo "skipped=true" >> "${GITHUB_OUTPUT}"
+            url="$(gh release view "${TAG}" --json url --jq .url || true)"
+            echo "release_url=${url}" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          url="$(gh release create "${TAG}" --generate-notes --target "${GITHUB_REF_NAME}")"
+          echo "release_url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Generate stubs"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Result | ${{ job.status }} |"
+            echo "| proto_ref | \`${{ steps.meta.outputs.proto_ref }}\` |"
+            echo "| Tag | \`${{ steps.publish.outputs.tag }}\` |"
+            echo "| Committed | ${{ steps.publish.outputs.committed }} |"
+            echo "| Skipped existing tag | ${{ steps.publish.outputs.skipped }} |"
+            echo "| Release | ${{ steps.publish.outputs.release_url || '—' }} |"
+            echo "| Event | ${{ github.event_name }} |"
+          } >> "${GITHUB_STEP_SUMMARY}"
