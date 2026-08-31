@@ -8,6 +8,10 @@ on:
       proto_ref:
         description: proto repo tag or SHA (e.g. v0.2.0)
         required: true
+      proto_repo:
+        description: owner/name of the proto repo (empty = PROTO_REPO var or huponx/x-protos)
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -17,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       proto_ref: ${{ steps.meta.outputs.proto_ref }}
+      proto_repo: ${{ steps.meta.outputs.proto_repo }}
       tag: ${{ steps.publish.outputs.tag }}
       committed: ${{ steps.publish.outputs.committed }}
       skipped: ${{ steps.publish.outputs.skipped }}
@@ -28,14 +33,21 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             ref="${{ github.event.client_payload.proto_ref }}"
+            repo="${{ github.event.client_payload.proto_repo }}"
           else
             ref="${{ inputs.proto_ref }}"
+            repo="${{ inputs.proto_repo }}"
           fi
+          if [ -z "${repo}" ]; then
+            repo="${{ vars.PROTO_REPO }}"
+          fi
+          repo="${repo:-huponx/x-protos}"
           if [ -z "${ref}" ]; then
             echo "proto_ref is empty" >&2
             exit 1
           fi
           echo "proto_ref=${ref}" >> "${GITHUB_OUTPUT}"
+          echo "proto_repo=${repo}" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/checkout@v5
         with:
@@ -44,7 +56,7 @@ jobs:
       - name: Checkout proto
         uses: actions/checkout@v5
         with:
-          repository: ${{ vars.PROTO_REPO != '' && vars.PROTO_REPO || 'huponx/x-protos' }}
+          repository: ${{ steps.meta.outputs.proto_repo }}
           ref: ${{ steps.meta.outputs.proto_ref }}
           path: proto-src
 
@@ -117,6 +129,7 @@ jobs:
             echo "|---|---|"
             echo "| Result | ${{ job.status }} |"
             echo "| proto_ref | \`${{ steps.meta.outputs.proto_ref }}\` |"
+            echo "| proto_repo | \`${{ steps.meta.outputs.proto_repo }}\` |"
             echo "| Tag | \`${{ steps.publish.outputs.tag }}\` |"
             echo "| Committed | ${{ steps.publish.outputs.committed }} |"
             echo "| Skipped existing tag | ${{ steps.publish.outputs.skipped }} |"
