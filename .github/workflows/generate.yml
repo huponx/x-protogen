@@ -1,4 +1,5 @@
 name: Generate stubs
+run-name: Generate ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.proto_ref || inputs.proto_ref }}
 
 on:
   repository_dispatch:
