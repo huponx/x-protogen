@@ -255,11 +255,11 @@ var File_courier_v1_courier_proto protoreflect.FileDescriptor
 const file_courier_v1_courier_proto_rawDesc = "" +
 	"\n" +
 	"\x18courier/v1/courier.proto\x12\n" +
-	"courier.v1\"Z\n" +
+	"courier.v1\"T\n" +
 	"\tRecipient\x12-\n" +
 	"\achannel\x18\n" +
 	" \x01(\x0e2\x13.courier.v1.ChannelR\achannel\x12\x18\n" +
-	"\aaddress\x18\x14 \x01(\tR\aaddressJ\x04\b\x1e\x10[\"\xd5\x02\n" +
+	"\aaddress\x18\x14 \x01(\tR\aaddress\"\xcf\x02\n" +
 	"\x17SendNotificationRequest\x12'\n" +
 	"\x0fidempotency_key\x18\n" +
 	" \x01(\tR\x0eidempotencyKey\x12\x16\n" +
@@ -272,7 +272,7 @@ const file_courier_v1_courier_proto_rawDesc = "" +
 	"recipients\x1a?\n" +
 	"\x11TemplateDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b<\x10[\"[\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"[\n" +
 	"\x18SendNotificationResponse\x12'\n" +
 	"\x0fnotification_id\x18\n" +
 	" \x01(\tR\x0enotificationId\x12\x16\n" +
